@@ -11,7 +11,7 @@ http://16.171.16.72:8000/
 ## API Documentation
 
 Explore the interactive API documentation (Swagger UI):  
-[http://16.171.16.72:8000/swagger/?format=openapi](http://16.171.16.72:8000/swagger/?format=openapi)
+[http://16.171.16.72:8000/swagger/](http://16.171.16.72:8000/swagger/)
 
 ---
 
