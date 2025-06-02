@@ -1,6 +1,6 @@
 # auth/urls.py
 from django.urls import path
-from .views import LoginView,ParentRegistrationView, TeacherRegistrationView,AdminRegistrationView,SetPinView,PinLoginView,DeleteUserView,EditProfileView,UpdatePasswordView,LogoutView
+from .views import LoginView,ParentRegistrationView, TeacherRegistrationView,AdminRegistrationView,SetPinView,PinLoginView,DeleteUserView,EditProfileView,UpdatePasswordView,LogoutView,UserProfileView
 
 urlpatterns = [
     path('auth/login', LoginView.as_view(), name='login'),
@@ -10,6 +10,9 @@ urlpatterns = [
     path("auth/register/teacher", TeacherRegistrationView.as_view(), name="register_teacher"),
     path("auth/register/admin", AdminRegistrationView.as_view(), name="register_admin"),
     path("<int:id>", DeleteUserView.as_view(), name="delete_user"), 
+    path("auth/profile", UserProfileView.as_view(), name="user_profile"),
+
+    
 
     # New URLs
     path("auth/profile/edit", EditProfileView.as_view(), name="edit_profile"),

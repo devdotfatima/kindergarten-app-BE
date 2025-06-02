@@ -11,9 +11,22 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from .models import User
 from kindergarten.models  import Teacher
-from .serializers import LoginSerializer,ParentRegistrationSerializer, TeacherRegistrationSerializer,AdminRegistrationSerializer,PinSerializer,PinLoginSerializer,EditProfileSerializer,UpdatePasswordSerializer
+from .serializers import LoginSerializer,ParentRegistrationSerializer, TeacherRegistrationSerializer,AdminRegistrationSerializer,PinSerializer,PinLoginSerializer,EditProfileSerializer,UpdatePasswordSerializer,UserProfileSerializer
 
 
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Get user profile",
+        operation_description="Returns the authenticated user's profile information.",
+        responses={200: UserProfileSerializer()}
+    )
+   
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user)
+        return Response(serializer.data)
 
 class DeleteUserView(DestroyAPIView):
     permission_classes = [IsAdminUser]  # Only admins can delete users

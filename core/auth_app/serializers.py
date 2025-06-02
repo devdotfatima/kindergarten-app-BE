@@ -4,6 +4,14 @@ from .models import User
 from kindergarten.models import Kindergarten,Teacher
 
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'role', 'profile_picture', 'fcm_token',
+        ]
+
+
 class EditProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
