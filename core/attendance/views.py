@@ -28,14 +28,21 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         )
 
     def validate_permission(self, request, child):
-        """Common permission validation for kindergarten-based access."""
-        if not request.user.is_superuser and request.user.role not in ["admin", "teacher"]:
-            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-        
-        if request.user.role in ["admin", "teacher"] and not self.has_kindergarten_access(request.user, child):
-            return Response({"error": "You do not have access to this kindergarten."}, status=status.HTTP_403_FORBIDDEN)
-        
-        return None
+        user = request.user
+
+        if user.role == "superadmin":
+            return None
+
+        if user.role == "parent":
+            if child.parent == user:
+                return None
+            return Response({"error": "You can only access your own child's attendance."}, status=status.HTTP_403_FORBIDDEN)
+
+        if user.role in ["admin", "teacher"] and self.has_kindergarten_access(user, child):
+            return None
+
+        return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
 
     @action(detail=False, methods=["get"], url_path="by-child/(?P<child_id>[^/.]+)/by-date")
     def get_attendance_by_child_and_date(self, request, child_id=None):
@@ -71,6 +78,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         permission_error = self.validate_permission(request, child)
         if permission_error:
             return permission_error
+        if request.user.role == "parent":
+          return Response({"error": "Parents cannot create attendance records."}, status=status.HTTP_403_FORBIDDEN)
+
         if Attendance.objects.filter(child_id=child_id, date=request.data.get("date",str(date.today()))).exists():
             return Response({"error": "Attendance record already exists for this date."}, status=status.HTTP_400_BAD_REQUEST)
         
