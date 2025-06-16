@@ -86,7 +86,7 @@ class NapViewSet(ModelViewSet):
             queryset = queryset.filter(child__class_id__in=teacher_classes)
 
         elif user.role == "parent":
-            return Nap.objects.none()  # Parents cannot access nap data
+            queryset = queryset.filter(child__parent=user)
 
         child_id = self.request.query_params.get("child_id")
         nap_date = self.request.query_params.get("date", str(date.today()))  # Default to today
