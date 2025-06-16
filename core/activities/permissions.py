@@ -6,6 +6,9 @@ class ActivityPermission(permissions.BasePermission):
         if request.user.is_authenticated:
             if request.user.role in ['superadmin', 'admin', 'teacher']:
                 return True
+            
+        if request.user.role == 'parent' and request.method in permissions.SAFE_METHODS:
+            return True            
         return False
 
     def has_object_permission(self, request, view, obj):
