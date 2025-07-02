@@ -228,8 +228,12 @@ class TeacherClassViewSet(viewsets.ModelViewSet):
             except KindergartenAdmin.DoesNotExist:
                 return TeacherClass.objects.none()
         elif user.role=="teacher":
-            teacher = Teacher.objects.get(user=user)
-            return TeacherClass.objects.filter(teacher=teacher)
+            teacher_profile = getattr(user, 'teacher_profile', None)
+            if not teacher_profile:
+                return TeacherClass.objects.none()
+            return TeacherClass.objects.filter(teacher=teacher_profile)
+            # teacher = Teacher.objects.get(user=user)
+            # return TeacherClass.objects.filter(teacher=teacher)
 
         return TeacherClass.objects.none()
 
