@@ -221,12 +221,15 @@ class TeacherClassViewSet(viewsets.ModelViewSet):
         if user.role == "superadmin":
             return TeacherClass.objects.all()
 
-        elif user.role == "admin":
+        if user.role == "admin":
             try:
                 admin = KindergartenAdmin.objects.get(user=user)
                 return TeacherClass.objects.filter(class_id__kindergarten=admin.kindergarten)
             except KindergartenAdmin.DoesNotExist:
                 return TeacherClass.objects.none()
+        elif user.role=="teacher":
+            teacher = Teacher.objects.get(user=user)
+            return TeacherClass.objects.filter(teacher=teacher)
 
         return TeacherClass.objects.none()
 
