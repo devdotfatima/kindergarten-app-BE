@@ -23,7 +23,7 @@ class UserProfileView(APIView):
         operation_description="Returns the profile information of the authenticated user or a user based on the provided ID.",
         responses={200: UserProfileSerializer()}
     )
-    def get(self, request):
+    def get(self, request, id=None):
         if id:
             # Fetch user by ID if provided
             user = get_object_or_404(User, id=id)
