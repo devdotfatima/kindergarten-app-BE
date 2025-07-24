@@ -5,12 +5,24 @@ from kindergarten.models import Kindergarten,Teacher
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    kindergarten_id = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'email', 'role', 'profile_picture', 'fcm_token',
+            'id', 'username', 'email', 'role', 'profile_picture', 'fcm_token', 'kindergarten_id'
         ]
 
+    def get_kindergarten_id(self, obj):
+        # Only include kindergarten_id for teachers
+        if obj.role == 'teacher':
+            # Get the related teacher profile and return the kindergarten id
+            try:
+                teacher = obj.teacher_profile
+                return teacher.kindergarten.id
+            except Teacher.DoesNotExist:
+                return None  # Return None if no teacher profile exists for the user
+        return None  # Return None if the user is not a teacher
 
 class EditProfileSerializer(serializers.ModelSerializer):
     class Meta:

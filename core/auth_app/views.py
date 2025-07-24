@@ -20,12 +20,17 @@ class UserProfileView(APIView):
 
     @swagger_auto_schema(
         operation_summary="Get user profile",
-        operation_description="Returns the authenticated user's profile information.",
+        operation_description="Returns the profile information of the authenticated user or a user based on the provided ID.",
         responses={200: UserProfileSerializer()}
     )
-   
     def get(self, request):
-        serializer = UserProfileSerializer(request.user)
+        if id:
+            # Fetch user by ID if provided
+            user = get_object_or_404(User, id=id)
+        else:
+            # If no ID is provided, fetch based on authenticated user
+            user = request.user
+        serializer = UserProfileSerializer(user)
         return Response(serializer.data)
 
 class DeleteUserView(DestroyAPIView):

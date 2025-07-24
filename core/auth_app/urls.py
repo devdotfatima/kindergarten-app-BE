@@ -11,6 +11,8 @@ urlpatterns = [
     path("auth/register/admin", AdminRegistrationView.as_view(), name="register_admin"),
     path("<int:id>", DeleteUserView.as_view(), name="delete_user"), 
     path("auth/profile", UserProfileView.as_view(), name="user_profile"),
+    path("auth/profile/<uuid:id>/", UserProfileView.as_view(), name="user_profile_by_id"),  # For user by ID
+
 
     
 
