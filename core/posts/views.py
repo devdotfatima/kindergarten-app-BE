@@ -112,11 +112,21 @@ class PostViewSet(ModelViewSet):
         - Parents: Can access posts if their child is in the class.
         """
         user = request.user
-        print(Post.objects.filter(class_id=class_id, kindergarten=user.kindergarten_admin.kindergarten).exists())
+        
         if user.is_superuser:
             posts = Post.objects.filter(class_id=class_id)
-        elif hasattr(user, "kindergarten_admin") and Post.objects.filter(class_id=class_id, kindergarten=user.kindergarten_admin.kindergarten).exists():
-            posts = Post.objects.filter(class_id=class_id)
+
+
+        
+        elif hasattr(user, "kindergarten_admin"):
+              if Post.objects.filter(class_id=class_id, kindergarten=user.kindergarten_admin.kindergarten).exists():
+                      posts = Post.objects.filter(class_id=class_id)
+              else:
+                      return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+
+
+
         elif hasattr(user, "teacher_profile") and int(class_id) in user.teacher_profile.teacher_classes.values_list("id", flat=True):
             posts = Post.objects.filter(class_id=class_id)
         elif hasattr(user, "parent") and user.parent.children.filter(class_id=class_id).exists():
