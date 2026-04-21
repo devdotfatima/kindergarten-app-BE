@@ -1,10 +1,11 @@
-from django.db.models import Count
+from django.db.models import Count, Sum, F
 from datetime import datetime, timedelta
 from django.db.models.functions import TruncDay, TruncWeek, TruncMonth, TruncYear
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import status, permissions
 from django.core.cache import cache
+from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
@@ -12,6 +13,7 @@ from drf_yasg import openapi
 
 from auth_app.models import User
 from kindergarten.models import Kindergarten, KindergartenClass, Teacher
+from kindergarten.permissions import IsSuperAdmin
 from children.models import Children
 from posts.models import Post
 from comments.models import Comment
@@ -21,8 +23,6 @@ from meals.models import Meal
 from hygiene.models import Hygiene
 from naps.models import Nap
 from mood.models import ChildMood
-from auth_app.models import User
-from children.models import Children
 
 class StatisticsAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated] 
@@ -176,3 +176,183 @@ def dashboard_statistics(request):
         return Response({"error": "Access Denied"}, status=403)
 
     return Response(stats)
+
+
+class TeacherActivityView(APIView):
+    """GET /analytics/teacher-activity/ — per-teacher activity summary (superadmin/admin)"""
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('kindergarten_id', openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
+            openapi.Parameter('start_date', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='YYYY-MM-DD'),
+            openapi.Parameter('end_date', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='YYYY-MM-DD'),
+        ],
+        responses={200: openapi.Response('Success', openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_OBJECT)))},
+    )
+    def get(self, request):
+        user = request.user
+        if user.role not in ('superadmin', 'admin'):
+            return Response({"error": "Access Denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+        kindergarten_id = request.GET.get('kindergarten_id')
+
+        teachers_qs = Teacher.objects.select_related('user', 'kindergarten')
+
+        if user.role == 'admin':
+            try:
+                kindergarten = user.kindergarten_admin.kindergarten
+            except AttributeError:
+                return Response({"error": "Not assigned to a kindergarten"}, status=400)
+            teachers_qs = teachers_qs.filter(kindergarten=kindergarten)
+        elif kindergarten_id:
+            teachers_qs = teachers_qs.filter(kindergarten_id=kindergarten_id)
+
+        result = []
+        for teacher in teachers_qs:
+            class_ids = teacher.teacher_classes.values_list('class_id', flat=True)
+
+            post_qs = Post.objects.filter(class_id__in=class_ids)
+            activity_qs = Activity.objects.filter(class_id__in=class_ids)
+            attendance_qs = Attendance.objects.filter(child__class_id__in=class_ids)
+
+            if start_date:
+                post_qs = post_qs.filter(created_at__date__gte=start_date)
+                activity_qs = activity_qs.filter(time__date__gte=start_date)
+                attendance_qs = attendance_qs.filter(date__gte=start_date)
+            if end_date:
+                post_qs = post_qs.filter(created_at__date__lte=end_date)
+                activity_qs = activity_qs.filter(time__date__lte=end_date)
+                attendance_qs = attendance_qs.filter(date__lte=end_date)
+
+            result.append({
+                'teacher_id': teacher.id,
+                'user_id': teacher.user.id,
+                'email': teacher.user.email,
+                'full_name': f"{teacher.user.first_name} {teacher.user.last_name}".strip(),
+                'kindergarten': teacher.kindergarten.name,
+                'total_posts': post_qs.count(),
+                'total_activities': activity_qs.count(),
+                'total_attendance_records': attendance_qs.count(),
+            })
+
+        return Response(result)
+
+
+class StudentProgressView(APIView):
+    """GET /analytics/student-progress/<child_id>/ — aggregated progress for one child"""
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('start_date', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='YYYY-MM-DD'),
+            openapi.Parameter('end_date', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='YYYY-MM-DD'),
+        ],
+        responses={200: openapi.Response('Success', openapi.Schema(type=openapi.TYPE_OBJECT))},
+    )
+    def get(self, request, child_id):
+        user = request.user
+        child = get_object_or_404(Children, id=child_id)
+
+        # Access control
+        if user.role == 'parent' and child.parent != user:
+            return Response({"error": "Access Denied"}, status=status.HTTP_403_FORBIDDEN)
+        if user.role == 'admin':
+            try:
+                if child.kindergarten != user.kindergarten_admin.kindergarten:
+                    return Response({"error": "Access Denied"}, status=status.HTTP_403_FORBIDDEN)
+            except AttributeError:
+                return Response({"error": "Not assigned to a kindergarten"}, status=400)
+        if user.role == 'teacher':
+            teacher_class_ids = user.teacher_profile.teacher_classes.values_list('class_id', flat=True)
+            if child.class_id_id not in teacher_class_ids:
+                return Response({"error": "Access Denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+
+        def date_filter(qs, field='date'):
+            if start_date:
+                qs = qs.filter(**{f'{field}__gte': start_date})
+            if end_date:
+                qs = qs.filter(**{f'{field}__lte': end_date})
+            return qs
+
+        attendance_qs = date_filter(child.attendances.all())
+        meals_qs = date_filter(child.meals.all())
+        moods_qs = date_filter(child.moods.all())
+        naps_qs = date_filter(child.naps.all())
+        hygiene_qs = date_filter(child.hygiene_records.all())
+
+        mood_distribution = dict(
+            moods_qs.values('mood').annotate(count=Count('id')).values_list('mood', 'count')
+        )
+
+        return Response({
+            'child_id': child.id,
+            'child_name': child.name,
+            'attendance_days': attendance_qs.count(),
+            'total_meals_logged': meals_qs.count(),
+            'mood_distribution': mood_distribution,
+            'total_naps': naps_qs.count(),
+            'total_hygiene_records': hygiene_qs.count(),
+        })
+
+
+class AttendanceReportView(APIView):
+    """GET /analytics/attendance-report/ — attendance summary by class/kindergarten"""
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('kindergarten_id', openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
+            openapi.Parameter('class_id', openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
+            openapi.Parameter('start_date', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='YYYY-MM-DD'),
+            openapi.Parameter('end_date', openapi.IN_QUERY, type=openapi.TYPE_STRING, description='YYYY-MM-DD'),
+        ],
+        responses={200: openapi.Response('Success', openapi.Schema(type=openapi.TYPE_OBJECT))},
+    )
+    def get(self, request):
+        user = request.user
+        if user.role not in ('superadmin', 'admin', 'teacher'):
+            return Response({"error": "Access Denied"}, status=status.HTTP_403_FORBIDDEN)
+
+        qs = Attendance.objects.all()
+
+        if user.role == 'admin':
+            try:
+                qs = qs.filter(child__kindergarten=user.kindergarten_admin.kindergarten)
+            except AttributeError:
+                return Response({"error": "Not assigned to a kindergarten"}, status=400)
+        elif user.role == 'teacher':
+            class_ids = user.teacher_profile.teacher_classes.values_list('class_id', flat=True)
+            qs = qs.filter(child__class_id__in=class_ids)
+
+        kindergarten_id = request.GET.get('kindergarten_id')
+        if kindergarten_id and user.role == 'superadmin':
+            qs = qs.filter(child__kindergarten_id=kindergarten_id)
+
+        class_id = request.GET.get('class_id')
+        if class_id:
+            qs = qs.filter(child__class_id=class_id)
+
+        start_date = request.GET.get('start_date')
+        if start_date:
+            qs = qs.filter(date__gte=start_date)
+
+        end_date = request.GET.get('end_date')
+        if end_date:
+            qs = qs.filter(date__lte=end_date)
+
+        by_class = (
+            qs.values('child__class_id', 'child__class_id__name', 'child__kindergarten__name')
+            .annotate(attendance_count=Count('id'))
+            .order_by('child__class_id')
+        )
+
+        return Response({
+            'total_attendance_records': qs.count(),
+            'by_class': list(by_class),
+        })
