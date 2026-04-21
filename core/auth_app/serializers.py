@@ -126,3 +126,97 @@ class PinLoginSerializer(serializers.Serializer):
         if not value.isdigit():
             raise serializers.ValidationError("PIN must contain only numbers.")
         return value
+
+
+class SuperAdminUserSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+    kindergarten_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'email', 'username', 'first_name', 'last_name', 'full_name',
+            'role', 'is_active', 'profile_picture', 'fcm_token', 'kindergarten_id',
+            'date_joined',
+        ]
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip()
+
+    def get_kindergarten_id(self, obj):
+        if obj.role == 'teacher':
+            try:
+                return obj.teacher_profile.kindergarten.id
+            except Exception:
+                return None
+        if obj.role == 'admin':
+            try:
+                return obj.kindergarten_admin.kindergarten.id
+            except Exception:
+                return None
+        return None
+
+
+class SuperAdminEditUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'profile_picture', 'fcm_token']
+
+
+class UserRoleChangeSerializer(serializers.Serializer):
+    VALID_ROLES = ['parent', 'teacher', 'admin', 'superadmin']
+    role = serializers.ChoiceField(choices=VALID_ROLES)
+
+
+class AdminCreateParentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['email', 'first_name', 'last_name', 'profile_picture']
+
+    def create(self, validated_data):
+        from django.utils.crypto import get_random_string
+        password = get_random_string(12)
+        validated_data['role'] = 'parent'
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user, password
+
+
+class AdminCreateTeacherSerializer(serializers.ModelSerializer):
+    kindergarten_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ['email', 'first_name', 'last_name', 'profile_picture', 'kindergarten_id']
+
+    def create(self, validated_data):
+        from django.utils.crypto import get_random_string
+        from kindergarten.models import Kindergarten, Teacher as TeacherModel
+        kindergarten_id = validated_data.pop('kindergarten_id')
+        try:
+            kindergarten = Kindergarten.objects.get(id=kindergarten_id)
+        except Kindergarten.DoesNotExist:
+            raise serializers.ValidationError({'kindergarten_id': 'Invalid kindergarten ID'})
+        password = get_random_string(12)
+        validated_data['role'] = 'teacher'
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        TeacherModel.objects.create(user=user, kindergarten=kindergarten)
+        return user, password
+
+
+class AdminCreateAdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['email', 'first_name', 'last_name', 'profile_picture']
+
+    def create(self, validated_data):
+        from django.utils.crypto import get_random_string
+        password = get_random_string(12)
+        validated_data['role'] = 'admin'
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user, password

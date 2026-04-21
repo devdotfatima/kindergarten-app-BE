@@ -35,7 +35,9 @@ urlpatterns = [
     path("",include('comments.urls')),
     path('', include('kindergarten.urls')),
     path('', include('analytics.urls')),
-    path('attendance/', include('attendance.urls')), 
+    path('attendance/', include('attendance.urls')),
+    path('superadmin/', include('audit.urls')),
+    path('system/', include('settings_app.urls')),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0),
          name='schema-swagger-ui'),
 ]
