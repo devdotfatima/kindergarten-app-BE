@@ -6,24 +6,42 @@ from kindergarten.models import Kindergarten,Teacher
 
 class UserProfileSerializer(serializers.ModelSerializer):
     kindergarten_id = serializers.SerializerMethodField()
-    full_name = serializers.SerializerMethodField() 
+    kindergarten_name = serializers.SerializerMethodField()
+    full_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'email', 'role', 'profile_picture', 'fcm_token', 'kindergarten_id',     'full_name'
+            'id', 'username', 'email', 'role', 'profile_picture', 'fcm_token',
+            'kindergarten_id', 'kindergarten_name', 'full_name'
         ]
 
     def get_kindergarten_id(self, obj):
-        # Only include kindergarten_id for teachers
         if obj.role == 'teacher':
-            # Get the related teacher profile and return the kindergarten id
             try:
-                teacher = obj.teacher_profile
-                return teacher.kindergarten.id
-            except Teacher.DoesNotExist:
-                return None  # Return None if no teacher profile exists for the user
-        return None  # Return None if the user is not a teacher
+                return obj.teacher_profile.kindergarten.id
+            except Exception:
+                return None
+        if obj.role == 'admin':
+            try:
+                return obj.kindergarten_admin.kindergarten.id
+            except Exception:
+                return None
+        return None
+
+    def get_kindergarten_name(self, obj):
+        if obj.role == 'teacher':
+            try:
+                return obj.teacher_profile.kindergarten.name
+            except Exception:
+                return None
+        if obj.role == 'admin':
+            try:
+                return obj.kindergarten_admin.kindergarten.name
+            except Exception:
+                return None
+        return None
+
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip()
 
