@@ -426,3 +426,40 @@ class AdminCreateAdminView(APIView):
             {"message": "Admin account created. Credentials sent to their email.", "user_id": user.id},
             status=status.HTTP_201_CREATED,
         )
+
+
+class AdminResetCredentialsView(APIView):
+    """POST /users/admin/reset-credentials/<id>/ — generate new password and email it to the user"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id):
+        from django.utils.crypto import get_random_string
+        caller = request.user
+
+        target = get_object_or_404(User, id=id)
+
+        # Superadmin: can reset anyone except other superadmins
+        if caller.role == 'superadmin':
+            if target.role == 'superadmin' and target.id != caller.id:
+                return Response({"message": "Cannot reset another superadmin's credentials."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Kindergarten admin: can only reset teachers in their own kindergarten
+        elif caller.role == 'admin':
+            if target.role != 'teacher':
+                return Response({"message": "Admins can only reset teacher credentials."}, status=status.HTTP_403_FORBIDDEN)
+            try:
+                admin_kg = caller.kindergarten_admin.kindergarten
+                teacher_kg = target.teacher_profile.kindergarten
+                if admin_kg != teacher_kg:
+                    return Response({"message": "Teacher does not belong to your kindergarten."}, status=status.HTTP_403_FORBIDDEN)
+            except Exception:
+                return Response({"message": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        else:
+            return Response({"message": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        new_password = get_random_string(10)
+        target.set_password(new_password)
+        target.save()
+        _send_credentials_email(target.email, new_password, target.role)
+        _audit(request.user, 'user_updated', 'User', target.id, {'action': 'credentials_reset', 'email': target.email})
+        return Response({"message": f"New credentials sent to {target.email}."}, status=status.HTTP_200_OK)

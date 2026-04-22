@@ -8,6 +8,7 @@ from .views import (
     UserListView, UserDetailView, UserDeactivateView, UserChangeRoleView,
     # Admin-created users with credential emails
     AdminCreateParentView, AdminCreateTeacherView, AdminCreateAdminView,
+    AdminResetCredentialsView,
 )
 
 urlpatterns = [
@@ -34,4 +35,5 @@ urlpatterns = [
     path("admin/create-parent/", AdminCreateParentView.as_view(), name="admin_create_parent"),
     path("admin/create-teacher/", AdminCreateTeacherView.as_view(), name="admin_create_teacher"),
     path("admin/create-admin/", AdminCreateAdminView.as_view(), name="admin_create_admin"),
+    path("admin/reset-credentials/<int:id>/", AdminResetCredentialsView.as_view(), name="admin_reset_credentials"),
 ]
