@@ -58,15 +58,16 @@ class TeacherClassSerializer(serializers.ModelSerializer):
         fields = ["id", "teacher", "teacher_name", "class_id", "class_name", "kindergarten_name"]
 
 class TeacherSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)
     full_name = serializers.CharField(source="user.get_full_name", read_only=True)
     profile_picture = serializers.CharField(source="user.profile_picture", read_only=True)
     kindergarten_name = serializers.CharField(source="kindergarten.name", read_only=True)
-    classes = TeacherClassSerializer(source="teacher_classes", many=True, read_only=True)  # Fetch all assigned classes
+    classes = TeacherClassSerializer(source="teacher_classes", many=True, read_only=True)
 
     class Meta:
         model = Teacher
-        fields = ["id", "email", "full_name", "profile_picture", "kindergarten", "kindergarten_name", "classes"]
+        fields = ["id", "user_id", "email", "full_name", "profile_picture", "kindergarten", "kindergarten_name", "classes"]
 
 class KindergartenSerializer(serializers.ModelSerializer):
     class Meta:
