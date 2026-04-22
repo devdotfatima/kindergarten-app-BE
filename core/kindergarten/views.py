@@ -129,6 +129,9 @@ class ClassView(APIView):
 
     def get(self, request):
         classes = KindergartenClass.objects.all()
+        kindergarten_id = request.query_params.get("kindergarten")
+        if kindergarten_id:
+            classes = classes.filter(kindergarten_id=kindergarten_id)
         serializer = ClassSerializer(classes, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
