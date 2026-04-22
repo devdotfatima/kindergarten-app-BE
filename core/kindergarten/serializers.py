@@ -70,7 +70,23 @@ class TeacherSerializer(serializers.ModelSerializer):
         fields = ["id", "user_id", "email", "full_name", "profile_picture", "kindergarten", "kindergarten_name", "classes"]
 
 class KindergartenSerializer(serializers.ModelSerializer):
+    admin_name = serializers.SerializerMethodField()
+    admin_email = serializers.SerializerMethodField()
+
+    def get_admin_name(self, obj):
+        try:
+            name = obj.admin_user.user.get_full_name()
+            return name or obj.admin_user.user.email
+        except Exception:
+            return None
+
+    def get_admin_email(self, obj):
+        try:
+            return obj.admin_user.user.email
+        except Exception:
+            return None
+
     class Meta:
         model = Kindergarten
-        fields = ["id", "name", "location"]
+        fields = ["id", "name", "location", "admin_name", "admin_email"]
         ref_name = "KindergartenKindergarten"
