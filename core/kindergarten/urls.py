@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import KindergartenViewSet, AttachAdminView, DetachAdminView, ClassView, TeacherClassViewSet,TeacherViewSet
+from .views import KindergartenViewSet, AttachAdminView, DetachAdminView, ClassView, ClassDetailView, TeacherClassViewSet,TeacherViewSet
 
 router = DefaultRouter()
 router.register(r'kindergarten', KindergartenViewSet, basename='kindergarten')
@@ -11,5 +11,6 @@ urlpatterns = [
     path('kindergarten/attach-admin/', AttachAdminView.as_view(), name='attach_admin'),
     path('kindergarten/detach-admin/', DetachAdminView.as_view(), name='detach_admin'),
     path('kindergarten/classes/', ClassView.as_view(), name='classes'),
+    path('kindergarten/classes/<int:pk>/', ClassDetailView.as_view(), name='class-detail'),
     path('', include(router.urls)),
 ]
