@@ -21,7 +21,10 @@ from .serializers import (
     UpdatePasswordSerializer, UserProfileSerializer, SuperAdminUserSerializer,
     SuperAdminEditUserSerializer, UserRoleChangeSerializer,
     AdminCreateParentSerializer, AdminCreateTeacherSerializer, AdminCreateAdminSerializer,
+    ForgotPasswordSerializer, VerifyOTPSerializer, ResetPasswordWithOTPSerializer,
 )
+from datetime import datetime, timedelta
+from django.utils import timezone
 
 
 
@@ -104,6 +107,178 @@ class UpdatePasswordView(APIView):
             user.set_password(new_password)
             user.save()
             return Response({"message": "Password updated successfully"}, status=status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ForgotPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        request_body=ForgotPasswordSerializer,
+        operation_summary="Request password reset OTP",
+        operation_description="Send a password reset OTP to the user's email address.",
+        responses={200: openapi.Response("Password reset OTP sent")}
+    )
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                # For security, don't reveal if email exists
+                return Response(
+                    {"message": "If the email exists in our system, a password reset OTP has been sent."},
+                    status=status.HTTP_200_OK
+                )
+            
+            # Generate a 6-digit OTP
+            import random
+            otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            
+            # Set OTP expiry to 10 minutes from now
+            user.password_reset_otp = otp
+            user.password_reset_otp_expiry = timezone.now() + timedelta(minutes=10)
+            user.password_reset_otp_verified = False
+            user.save()
+            
+            # Send email with OTP
+            email_body = f"""
+            Hello {user.first_name or user.email},
+
+            You requested a password reset. Your OTP is:
+            {otp}
+
+            This OTP will expire in 10 minutes.
+
+            If you did not request this, please ignore this email.
+
+            Best regards,
+            Kindergarten App Team
+            """
+            
+            try:
+                send_mail(
+                    subject="Password Reset OTP",
+                    message=email_body,
+                    from_email=django_settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                print(f"Failed to send OTP email: {str(e)}")
+                # Still return success to user for security reasons
+            
+            return Response(
+                {"message": "If the email exists in our system, a password reset OTP has been sent."},
+                status=status.HTTP_200_OK
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VerifyPasswordResetOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        request_body=VerifyOTPSerializer,
+        operation_summary="Verify password reset OTP",
+        operation_description="Verify the OTP sent to user's email for password reset.",
+        responses={200: openapi.Response("OTP verified successfully")}
+    )
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            otp = serializer.validated_data['otp']
+            
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response(
+                    {"message": "Invalid email or OTP."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if OTP matches
+            if user.password_reset_otp != otp:
+                return Response(
+                    {"message": "Invalid OTP."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if OTP has expired
+            if user.password_reset_otp_expiry < timezone.now():
+                return Response(
+                    {"message": "OTP has expired. Please request a new one."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Mark OTP as verified
+            user.password_reset_otp_verified = True
+            user.save()
+            
+            return Response(
+                {"message": "OTP verified successfully."},
+                status=status.HTTP_200_OK
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        request_body=ResetPasswordWithOTPSerializer,
+        operation_summary="Reset password after OTP verification",
+        operation_description="Reset the user's password after OTP has been verified.",
+        responses={200: openapi.Response("Password reset successfully")}
+    )
+    def post(self, request):
+        serializer = ResetPasswordWithOTPSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            new_password = serializer.validated_data['new_password']
+            
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response(
+                    {"message": "Invalid email."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if OTP was verified
+            if not user.password_reset_otp_verified:
+                return Response(
+                    {"message": "Please verify OTP first."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if OTP has expired
+            if user.password_reset_otp_expiry and user.password_reset_otp_expiry < timezone.now():
+                return Response(
+                    {"message": "Password reset session has expired. Please request a new OTP."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Reset the password
+            user.set_password(new_password)
+            user.password_reset_otp = None
+            user.password_reset_otp_expiry = None
+            user.password_reset_otp_verified = False
+            user.save()
+            
+            return Response(
+                {"message": "Password has been reset successfully."},
+                status=status.HTTP_200_OK
+            )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

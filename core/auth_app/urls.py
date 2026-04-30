@@ -3,7 +3,7 @@ from django.urls import path
 from .views import (
     LoginView, ParentRegistrationView, TeacherRegistrationView, AdminRegistrationView,
     SetPinView, PinLoginView, DeleteUserView, EditProfileView, UpdatePasswordView,
-    LogoutView, UserProfileView,
+    LogoutView, UserProfileView, ForgotPasswordView, VerifyPasswordResetOTPView, ResetPasswordView,
     # Superadmin user management
     UserListView, UserDetailView, UserDeactivateView, UserChangeRoleView,
     # Admin-created users with credential emails
@@ -23,6 +23,9 @@ urlpatterns = [
     path("auth/profile/<int:id>/", UserProfileView.as_view(), name="user_profile_by_id"),
     path("auth/profile/edit", EditProfileView.as_view(), name="edit_profile"),
     path("auth/profile/update-password", UpdatePasswordView.as_view(), name="update_password"),
+    path("auth/forgot-password", ForgotPasswordView.as_view(), name="forgot_password"),
+    path("auth/verify-otp", VerifyPasswordResetOTPView.as_view(), name="verify_otp"),
+    path("auth/reset-password", ResetPasswordView.as_view(), name="reset_password"),
     path("auth/logout", LogoutView.as_view(), name="logout"),
 
     # Superadmin: user management (specific paths before generic <str:action>)

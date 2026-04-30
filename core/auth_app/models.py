@@ -50,6 +50,9 @@ class User(AbstractUser):
     pin = models.CharField(max_length=128, blank=True, null=True) 
     profile_picture = models.TextField( null=True, blank=True)
     fcm_token = models.CharField(max_length=255, blank=True, null=True)
+    password_reset_otp = models.CharField(max_length=6, blank=True, null=True)
+    password_reset_otp_expiry = models.DateTimeField(blank=True, null=True)
+    password_reset_otp_verified = models.BooleanField(default=False)
 
     objects = UserManager()  
 
