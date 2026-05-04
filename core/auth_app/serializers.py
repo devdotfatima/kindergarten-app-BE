@@ -197,7 +197,7 @@ class SuperAdminUserSerializer(serializers.ModelSerializer):
 class SuperAdminEditUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'profile_picture', 'fcm_token']
+        fields = ['first_name', 'last_name', 'phone_number', 'profile_picture', 'fcm_token']
 
 
 class UserRoleChangeSerializer(serializers.Serializer):
