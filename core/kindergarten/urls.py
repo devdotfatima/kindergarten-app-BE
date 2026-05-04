@@ -1,11 +1,12 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import KindergartenViewSet, AttachAdminView, DetachAdminView, ClassView, ClassDetailView, TeacherClassViewSet,TeacherViewSet
+from .views import KindergartenViewSet, AttachAdminView, DetachAdminView, ClassView, ClassDetailView, TeacherClassViewSet, TeacherViewSet, SectionViewSet
 
 router = DefaultRouter()
 router.register(r'kindergarten', KindergartenViewSet, basename='kindergarten')
 router.register(r'teacher-classes', TeacherClassViewSet, basename='teacher-classes')
 router.register(r'teachers', TeacherViewSet, basename='teachers')
+router.register(r'sections', SectionViewSet, basename='sections')
 
 urlpatterns = [
     path('kindergarten/attach-admin/', AttachAdminView.as_view(), name='attach_admin'),

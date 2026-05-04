@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Kindergarten,KindergartenAdmin,KindergartenClass,TeacherClass,Teacher
+from .models import Kindergarten, KindergartenAdmin, KindergartenClass, TeacherClass, Teacher, Section
 from django.contrib.auth import get_user_model
 
 
@@ -12,9 +12,6 @@ class KindergartenAdminSerializer(serializers.ModelSerializer):
         fields = ['user', 'kindergarten']
 
     def validate_user(self, value):
-        """
-        Ensure the user is of role 'admin' and exists in the users table.
-        """
         if value.role != 'admin':
             raise serializers.ValidationError("Only admins can be assigned to kindergartens.")
         return value
@@ -31,8 +28,6 @@ class AttachAdminSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = User.objects.get(id=validated_data['user_id'])
         kindergarten = Kindergarten.objects.get(id=validated_data['kindergarten_id'])
-
-        # Create a KindergartenAdmin object to attach the admin to the kindergarten
         kindergarten_admin = KindergartenAdmin.objects.create(user=user, kindergarten=kindergarten)
         return kindergarten_admin
 
@@ -42,32 +37,51 @@ class DetachAdminSerializer(serializers.Serializer):
     kindergarten_id = serializers.IntegerField()
 
 
+class SectionSerializer(serializers.ModelSerializer):
+    kindergarten_name = serializers.CharField(source='kindergarten.name', read_only=True)
+
+    class Meta:
+        model = Section
+        fields = ['id', 'name', 'kindergarten', 'kindergarten_name']
+
+
 class ClassSerializer(serializers.ModelSerializer):
+    kindergarten_name = serializers.CharField(source='kindergarten.name', read_only=True)
+    section_name = serializers.CharField(source='section.name', read_only=True, default=None)
+
     class Meta:
         model = KindergartenClass
-        fields = '__all__'
+        fields = ['id', 'name', 'kindergarten', 'kindergarten_name', 'section', 'section_name']
 
 
 class TeacherClassSerializer(serializers.ModelSerializer):
     class_name = serializers.CharField(source="class_id.name", read_only=True)
     kindergarten_name = serializers.CharField(source="class_id.kindergarten.name", read_only=True)
-    teacher_name = serializers.CharField(source="teacher.user.get_full_name", read_only=True)  # Fetch teacher name
+    teacher_name = serializers.CharField(source="teacher.user.get_full_name", read_only=True)
 
     class Meta:
         model = TeacherClass
         fields = ["id", "teacher", "teacher_name", "class_id", "class_name", "kindergarten_name"]
 
+
 class TeacherSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)
     full_name = serializers.CharField(source="user.get_full_name", read_only=True)
+    first_name = serializers.CharField(source="user.first_name", read_only=True)
+    last_name = serializers.CharField(source="user.last_name", read_only=True)
     profile_picture = serializers.CharField(source="user.profile_picture", read_only=True)
+    phone_number = serializers.CharField(source="user.phone_number", read_only=True)
     kindergarten_name = serializers.CharField(source="kindergarten.name", read_only=True)
     classes = TeacherClassSerializer(source="teacher_classes", many=True, read_only=True)
 
     class Meta:
         model = Teacher
-        fields = ["id", "user_id", "email", "full_name", "profile_picture", "kindergarten", "kindergarten_name", "classes"]
+        fields = [
+            "id", "user_id", "email", "full_name", "first_name", "last_name",
+            "phone_number", "profile_picture", "kindergarten", "kindergarten_name", "classes"
+        ]
+
 
 class KindergartenSerializer(serializers.ModelSerializer):
     admin_name = serializers.SerializerMethodField()

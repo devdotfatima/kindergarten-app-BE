@@ -9,8 +9,8 @@ from django.db import transaction
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from django.shortcuts import get_object_or_404
-from .models import KindergartenAdmin, Kindergarten,TeacherClass,KindergartenClass,Teacher
-from .serializers import KindergartenSerializer,AttachAdminSerializer, DetachAdminSerializer,TeacherClassSerializer,ClassSerializer,TeacherSerializer
+from .models import KindergartenAdmin, Kindergarten, TeacherClass, KindergartenClass, Teacher, Section
+from .serializers import KindergartenSerializer, AttachAdminSerializer, DetachAdminSerializer, TeacherClassSerializer, ClassSerializer, TeacherSerializer, SectionSerializer
 from .permissions import KindergartenPermission,IsSuperAdmin
 
 
@@ -241,6 +241,34 @@ class TeacherViewSet(viewsets.ModelViewSet):
             return Response({"message": "Teacher and associated user deleted."}, status=status.HTTP_204_NO_CONTENT)
 
         return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+
+class SectionViewSet(viewsets.ModelViewSet):
+    serializer_class = SectionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'superadmin' or user.is_superuser:
+            return Section.objects.all()
+        if user.role == 'admin':
+            try:
+                return Section.objects.filter(kindergarten=user.kindergarten_admin.kindergarten)
+            except Exception:
+                return Section.objects.none()
+        return Section.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role == 'admin':
+            try:
+                kindergarten = user.kindergarten_admin.kindergarten
+                serializer.save(kindergarten=kindergarten)
+            except Exception:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You are not assigned as an admin for any kindergarten.")
+        else:
+            serializer.save()
 
 
 class TeacherClassViewSet(viewsets.ModelViewSet):

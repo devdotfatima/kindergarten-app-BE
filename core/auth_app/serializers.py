@@ -13,7 +13,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'role', 'profile_picture', 'fcm_token',
-            'kindergarten_id', 'kindergarten_name', 'full_name'
+            'phone_number', 'kindergarten_id', 'kindergarten_name', 'full_name'
         ]
 
     def get_kindergarten_id(self, obj):
@@ -173,8 +173,8 @@ class SuperAdminUserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'email', 'username', 'first_name', 'last_name', 'full_name',
-            'role', 'is_active', 'profile_picture', 'fcm_token', 'kindergarten_id',
-            'date_joined',
+            'role', 'is_active', 'profile_picture', 'fcm_token', 'phone_number',
+            'kindergarten_id', 'date_joined',
         ]
 
     def get_full_name(self, obj):
@@ -208,7 +208,7 @@ class UserRoleChangeSerializer(serializers.Serializer):
 class AdminCreateParentSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'profile_picture']
+        fields = ['email', 'first_name', 'last_name', 'phone_number', 'profile_picture']
 
     def create(self, validated_data):
         from django.utils.crypto import get_random_string
@@ -225,7 +225,7 @@ class AdminCreateTeacherSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'profile_picture', 'kindergarten_id']
+        fields = ['email', 'first_name', 'last_name', 'phone_number', 'profile_picture', 'kindergarten_id']
 
     def create(self, validated_data):
         from django.utils.crypto import get_random_string

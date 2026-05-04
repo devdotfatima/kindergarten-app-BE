@@ -20,9 +20,18 @@ class Teacher(models.Model):
         return f"{self.user.email} - {self.kindergarten.name}"
 
 
+class Section(models.Model):
+    name = models.CharField(max_length=200)
+    kindergarten = models.ForeignKey(Kindergarten, on_delete=models.CASCADE, related_name='sections')
+
+    def __str__(self):
+        return f"{self.name} ({self.kindergarten.name})"
+
+
 class KindergartenClass(models.Model):
     name = models.CharField(max_length=255)
     kindergarten = models.ForeignKey(Kindergarten, on_delete=models.CASCADE, related_name="classes")
+    section = models.ForeignKey(Section, null=True, blank=True, on_delete=models.SET_NULL, related_name='classes')
 
     def __str__(self):
         return f"{self.name} - {self.kindergarten.name}"

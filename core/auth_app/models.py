@@ -49,6 +49,7 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="parent")
     pin = models.CharField(max_length=128, blank=True, null=True) 
     profile_picture = models.TextField( null=True, blank=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
     fcm_token = models.CharField(max_length=255, blank=True, null=True)
     password_reset_otp = models.CharField(max_length=6, blank=True, null=True)
     password_reset_otp_expiry = models.DateTimeField(blank=True, null=True)
