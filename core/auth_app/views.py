@@ -650,17 +650,20 @@ class AdminResetCredentialsView(APIView):
             if target.role == 'superadmin' and target.id != caller.id:
                 return Response({"message": "Cannot reset another superadmin's credentials."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Kindergarten admin: can only reset teachers in their own kindergarten
+        # Kindergarten admin: can reset teachers in their kindergarten and any parent
         elif caller.role == 'admin':
-            if target.role != 'teacher':
-                return Response({"message": "Admins can only reset teacher credentials."}, status=status.HTTP_403_FORBIDDEN)
-            try:
-                admin_kg = caller.kindergarten_admin.kindergarten
-                teacher_kg = target.teacher_profile.kindergarten
-                if admin_kg != teacher_kg:
-                    return Response({"message": "Teacher does not belong to your kindergarten."}, status=status.HTTP_403_FORBIDDEN)
-            except Exception:
-                return Response({"message": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+            if target.role == 'teacher':
+                try:
+                    admin_kg = caller.kindergarten_admin.kindergarten
+                    teacher_kg = target.teacher_profile.kindergarten
+                    if admin_kg != teacher_kg:
+                        return Response({"message": "Teacher does not belong to your kindergarten."}, status=status.HTTP_403_FORBIDDEN)
+                except Exception:
+                    return Response({"message": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+            elif target.role == 'parent':
+                pass  # admin can reset any parent's credentials
+            else:
+                return Response({"message": "Admins can only reset teacher or parent credentials."}, status=status.HTTP_403_FORBIDDEN)
         else:
             return Response({"message": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
