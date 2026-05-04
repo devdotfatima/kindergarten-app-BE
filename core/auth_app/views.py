@@ -398,8 +398,11 @@ class PinLoginView(APIView):
 # ── Superadmin User Management ──────────────────────────────────────────────
 
 class UserListView(APIView):
-    """GET /users/list/ — list all users, filterable by role / is_active / kindergarten_id"""
-    permission_classes = [IsSuperAdmin]
+    """GET /users/list/ — list users filterable by role / is_active / kindergarten_id.
+    Superadmin: full access.
+    Admin: can only list parents (role=parent is enforced regardless of query param).
+    """
+    permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         manual_parameters=[
@@ -413,6 +416,18 @@ class UserListView(APIView):
         responses={200: SuperAdminUserSerializer(many=True)}
     )
     def get(self, request):
+        user = request.user
+
+        # Admins can only list parents
+        if user.role == 'admin':
+            qs = User.objects.filter(role='parent').order_by('-date_joined')
+            serializer = SuperAdminUserSerializer(qs, many=True)
+            return Response(serializer.data)
+
+        # Superadmin: full access with all filters
+        if not (user.is_superuser or user.role == 'superadmin'):
+            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+
         qs = User.objects.all().order_by('-date_joined')
 
         role = request.GET.get('role')
@@ -438,21 +453,38 @@ class UserListView(APIView):
 
 
 class UserDetailView(APIView):
-    """GET/PATCH /users/manage/<id>/ — view or edit any user (superadmin only)"""
-    permission_classes = [IsSuperAdmin]
+    """GET/PATCH /users/manage/<id>/ — view or edit a user.
+    Superadmin: full access to any user.
+    Admin: can only view/edit parents.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _check_admin_access(self, request, target_user):
+        """Returns error Response if admin tries to access a non-parent, else None."""
+        if request.user.role == 'admin' and target_user.role != 'parent':
+            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+        if not (request.user.is_superuser or request.user.role in ('superadmin', 'admin')):
+            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+        return None
 
     @swagger_auto_schema(responses={200: SuperAdminUserSerializer()})
     def get(self, request, id):
-        user = get_object_or_404(User, id=id)
-        return Response(SuperAdminUserSerializer(user).data)
+        target = get_object_or_404(User, id=id)
+        err = self._check_admin_access(request, target)
+        if err:
+            return err
+        return Response(SuperAdminUserSerializer(target).data)
 
     @swagger_auto_schema(request_body=SuperAdminEditUserSerializer, responses={200: SuperAdminUserSerializer()})
     def patch(self, request, id):
-        user = get_object_or_404(User, id=id)
-        serializer = SuperAdminEditUserSerializer(user, data=request.data, partial=True)
+        target = get_object_or_404(User, id=id)
+        err = self._check_admin_access(request, target)
+        if err:
+            return err
+        serializer = SuperAdminEditUserSerializer(target, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(SuperAdminUserSerializer(user).data)
+            return Response(SuperAdminUserSerializer(target).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
