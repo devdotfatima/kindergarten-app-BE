@@ -1,5 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
@@ -9,8 +11,11 @@ from .serializers import AuditLogSerializer
 
 
 class AccessLogView(APIView):
-    """GET /admin/access-logs/ — paginated audit log (superadmin only)"""
-    permission_classes = [IsSuperAdmin]
+    """GET /admin/access-logs/
+    Superadmin: all logs.
+    Admin: only logs where actor=self.
+    """
+    permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         manual_parameters=[
@@ -26,7 +31,15 @@ class AccessLogView(APIView):
         responses={200: AuditLogSerializer(many=True)},
     )
     def get(self, request):
+        user = request.user
+        if user.role not in ('admin', 'superadmin') and not user.is_superuser:
+            return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
+
         qs = AuditLog.objects.all()
+
+        # Admin can only see their own audit logs
+        if user.role == 'admin':
+            qs = qs.filter(actor=user)
 
         action = request.GET.get('action')
         if action:

@@ -1,4 +1,5 @@
 from rest_framework import status
+from django.db import models
 from rest_framework.generics import DestroyAPIView
 from rest_framework.permissions import AllowAny,IsAuthenticated,IsAdminUser
 from rest_framework.throttling import AnonRateThrottle
@@ -418,9 +419,26 @@ class UserListView(APIView):
     def get(self, request):
         user = request.user
 
-        # Admins can only list parents
+        # Admins: can list parents and their kindergarten's teachers
         if user.role == 'admin':
-            qs = User.objects.filter(role='parent').order_by('-date_joined')
+            role_param = request.GET.get('role')
+            try:
+                kg = user.kindergarten_admin.kindergarten
+            except Exception:
+                kg = None
+
+            if role_param == 'teacher':
+                teacher_user_ids = Teacher.objects.filter(kindergarten=kg).values_list('user_id', flat=True) if kg else []
+                qs = User.objects.filter(id__in=teacher_user_ids).order_by('-date_joined')
+            elif role_param == 'parent':
+                qs = User.objects.filter(role='parent').order_by('-date_joined')
+            else:
+                # No param: return both teachers in their kg + all parents
+                teacher_user_ids = Teacher.objects.filter(kindergarten=kg).values_list('user_id', flat=True) if kg else []
+                qs = User.objects.filter(
+                    models.Q(role='parent') | models.Q(id__in=teacher_user_ids)
+                ).order_by('-date_joined')
+
             serializer = SuperAdminUserSerializer(qs, many=True)
             return Response(serializer.data)
 
@@ -460,10 +478,20 @@ class UserDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _check_admin_access(self, request, target_user):
-        """Returns error Response if admin tries to access a non-parent, else None."""
-        if request.user.role == 'admin' and target_user.role != 'parent':
-            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+        """Returns error Response if admin doesn't have access to this user, else None."""
         if not (request.user.is_superuser or request.user.role in ('superadmin', 'admin')):
+            return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role == 'admin':
+            # Admin can access parents (any) and teachers in their kindergarten
+            if target_user.role == 'parent':
+                return None
+            if target_user.role == 'teacher':
+                try:
+                    kg = request.user.kindergarten_admin.kindergarten
+                    if Teacher.objects.filter(user=target_user, kindergarten=kg).exists():
+                        return None
+                except Exception:
+                    pass
             return Response({"detail": "You do not have permission to perform this action."}, status=status.HTTP_403_FORBIDDEN)
         return None
 
@@ -490,12 +518,28 @@ class UserDetailView(APIView):
 
 class UserDeactivateView(APIView):
     """PATCH /users/manage/<id>/deactivate/ and /users/manage/<id>/activate/"""
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [IsAuthenticated]
 
     def patch(self, request, id, action):
+        caller = request.user
+        if caller.role not in ('admin', 'superadmin') and not caller.is_superuser:
+            return Response({"detail": "You do not have permission."}, status=status.HTTP_403_FORBIDDEN)
+
         user = get_object_or_404(User, id=id)
         if user.role == 'superadmin':
             return Response({"message": "Cannot deactivate a superadmin account."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Admin can only deactivate teachers in their kg or parents
+        if caller.role == 'admin':
+            if user.role == 'teacher':
+                try:
+                    kg = caller.kindergarten_admin.kindergarten
+                    if not Teacher.objects.filter(user=user, kindergarten=kg).exists():
+                        return Response({"detail": "Teacher does not belong to your kindergarten."}, status=status.HTTP_403_FORBIDDEN)
+                except Exception:
+                    return Response({"detail": "You are not associated with a kindergarten."}, status=status.HTTP_403_FORBIDDEN)
+            elif user.role not in ('parent',):
+                return Response({"detail": "You can only manage teachers and parents."}, status=status.HTTP_403_FORBIDDEN)
 
         if action == 'deactivate':
             user.is_active = False

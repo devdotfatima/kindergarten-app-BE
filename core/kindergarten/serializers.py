@@ -72,6 +72,7 @@ class TeacherSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source="user.last_name", read_only=True)
     profile_picture = serializers.CharField(source="user.profile_picture", read_only=True)
     phone_number = serializers.CharField(source="user.phone_number", read_only=True)
+    is_active = serializers.BooleanField(source="user.is_active", read_only=True)
     kindergarten_name = serializers.CharField(source="kindergarten.name", read_only=True)
     classes = TeacherClassSerializer(source="teacher_classes", many=True, read_only=True)
 
@@ -79,7 +80,7 @@ class TeacherSerializer(serializers.ModelSerializer):
         model = Teacher
         fields = [
             "id", "user_id", "email", "full_name", "first_name", "last_name",
-            "phone_number", "profile_picture", "kindergarten", "kindergarten_name", "classes"
+            "phone_number", "profile_picture", "is_active", "kindergarten", "kindergarten_name", "classes"
         ]
 
 

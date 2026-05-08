@@ -3,6 +3,7 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
@@ -49,6 +50,24 @@ class CommentViewSet(ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if user.role in ('superadmin',) or user.is_superuser:
+            instance.delete()
+            return
+        if user.role == 'admin':
+            try:
+                if instance.post.kindergarten == user.kindergarten_admin.kindergarten:
+                    instance.delete()
+                    return
+            except Exception:
+                pass
+            raise PermissionDenied("You do not have permission to delete this comment.")
+        if instance.user == user:
+            instance.delete()
+            return
+        raise PermissionDenied("You do not have permission to delete this comment.")
     
     @action(detail=True, methods=["POST"], url_path="toggle-like")
     def toggle_like(self, request, pk=None):

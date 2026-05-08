@@ -10,6 +10,7 @@ from .views import (
     AdminCreateParentView, AdminCreateTeacherView, AdminCreateAdminView,
     AdminResetCredentialsView,
 )
+from .export_views import FullDataExportView, KindergartenDataExportView, AccessLogsExportView
 
 urlpatterns = [
     path('auth/login', LoginView.as_view(), name='login'),
@@ -39,4 +40,9 @@ urlpatterns = [
     path("admin/create-teacher/", AdminCreateTeacherView.as_view(), name="admin_create_teacher"),
     path("admin/create-admin/", AdminCreateAdminView.as_view(), name="admin_create_admin"),
     path("admin/reset-credentials/<int:id>/", AdminResetCredentialsView.as_view(), name="admin_reset_credentials"),
+
+    # Data export
+    path("export/full/", FullDataExportView.as_view(), name="export_full"),
+    path("export/my-kindergarten/", KindergartenDataExportView.as_view(), name="export_kg"),
+    path("export/access-logs/", AccessLogsExportView.as_view(), name="export_logs"),
 ]
