@@ -5,13 +5,11 @@ from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from datetime import date
 
 from .models import ChildMood
 from .serializers import ChildMoodSerializer
 from .permissions import CanManageChildMood
 from children.models import Children
-from attendance.models import Attendance
 
 class ChildMoodViewSet(ModelViewSet):
     queryset = ChildMood.objects.all()
@@ -66,11 +64,6 @@ class ChildMoodViewSet(ModelViewSet):
         if permission_error:
             error_message = permission_error.data.get("error", "Permission denied.")
             raise serializers.ValidationError({"error": error_message})
-
-        # Prevent mood creation if the child has not checked in
-        today = date.today()
-        if not Attendance.objects.filter(child=child, date=today).exists():
-            raise serializers.ValidationError({"error": "Cannot add mood. Child has not checked in today."})
 
         serializer.save()
 

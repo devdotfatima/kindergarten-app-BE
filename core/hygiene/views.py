@@ -10,8 +10,6 @@ from hygiene.models import Hygiene
 from hygiene.serializers import HygieneSerializer
 from hygiene.permissions import CanManageHygieneActivities
 from children.models import Children
-from attendance.models import Attendance
-from datetime import date
 
 
 class HygieneViewSet(ModelViewSet):
@@ -59,7 +57,7 @@ class HygieneViewSet(ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        """Ensure only superadmins or kindergarten admins can create an attendance record."""
+        """Ensure the requesting user has permission to add a hygiene activity for this child."""
         child_id = self.request.data.get("child")
         child = get_object_or_404(Children, id=child_id)
         permission_error = self.validate_permission(self.request, child)
@@ -67,14 +65,6 @@ class HygieneViewSet(ModelViewSet):
         if permission_error:
           error_message = permission_error.data.get("error", "Permission denied.")
           raise serializers.ValidationError({"error": error_message})
-
- 
-        """Prevent meal creation if the child has not checked in."""
-        child = serializer.validated_data["child"]
-        today = date.today()
-
-        if not Attendance.objects.filter(child=child, date=today).exists():
-            raise serializers.ValidationError({"error": "Cannot add meal. Child has not checked in today."})
 
         serializer.save()
 
